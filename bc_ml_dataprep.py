@@ -68,14 +68,13 @@ from sklearn.model_selection import train_test_split
 import os
 import datetime as dt
 
-
 # Define static variables
 ___OTHERPC___ = 'C:/Users/Andrea Luca Lampart/Documents/Barbara/from Wharton_B_query1/wharton_ml3.csv'
-___THISPC___ = '/home/andy/barbara/github/machine-learning/from Wharton_B_query1/wharton_ml3.csv'
+___THISPC___ = '/home/andy/barbara/github_ml_uzh/Machine_Learning_in_Finance_Group_Project/Data/wharton_ml3.csv'
 ___OTHERRATIOS___ = 'C:/Users/Andrea Luca Lampart/Documents/Barbara/from OLAT/Ratios.csv'
-___THISRATIOS___ = '/home/andy/barbara/github/machine-learning/from OLAT/Ratios.csv'
+___THISRATIOS___ = '/home/andy/barbara/github_ml_uzh/Machine_Learning_in_Finance_Group_Project/Data/Ratios.csv'
 ___OTHEROUTPUT___ = 'C:/Users/Andrea Luca Lampart/Documents/Barbara/generated/'
-___THISOUTPUT___ = '/home/andy/barbara/github/machine-learning/generated/'
+___THISOUTPUT___ = '/home/andy/barbara/github_ml_uzh/Machine_Learning_in_Finance_Group_Project/Data/generated/'
 ___FILLSTRAT___ = 'mean'
 
 ###############################################################################################################
@@ -158,6 +157,7 @@ wharton = wharton.drop('MOVEMENT', axis =1)
 wharton['DATE'] = wharton['DATE'].apply(lambda dt: dt.replace(day=1))
 ratios_all['DATE'] = ratios_all['DATE'].apply(lambda dt: dt.replace(day=1))
 
+
 ### JOIN DATASETS, OUTER
 # Set index
 wharton = wharton.set_index(['PERMNO', 'DATE'])
@@ -165,6 +165,12 @@ ratios_all = ratios_all.set_index(['PERMNO', 'DATE'])
 
 # join datasets
 joined_dataset = wharton.join(ratios_all, how = 'outer')
+
+
+###################=====>
+# delete datasets we do not need anymore
+del wharton, ratios_all
+
 
 # reset index
 joined_dataset = joined_dataset.reset_index()
@@ -211,90 +217,21 @@ del df_key, permno_group, grouped_by_permno
 # Make date numeric because RF can not use otherwise
 joined_dataset['DATE'] = joined_dataset['DATE'].astype('int64')
 
+# save file so we can use it later
+joined_dataset.to_csv(___THISOUTPUT___ + 'joined_dataset_ml.csv')
 
-###############################################################################################################
-#                                                    RANDOM FOREST                                            #
-###############################################################################################################
-
-##### FIRST: RUN FOREST WITHOUT REMOVING FEATURES BELOW!
-##### SECOND: REMOVE FEATURES THAT ARE "USELESS"
-##### THIRD: RUN THE FOREST AGAIN AND SEE THE SCORE
-
-# Remove a lot of variables that were foud useless in the RF process
-joined_dataset = joined_dataset.drop(['debt_at', 'cash_conversion', 'at_turn', 'adv_sale', 'rect_turn',
-       'de_ratio', 'divyield', 'pretret_earnat', 'gpm', 'sale_nwc',
-       'pretret_noa', 'npm', 'intcov_ratio', 'efftax', 'roe', 'roa', 'PRC_MOV',
-       'sale_invcap', 'debt_ebitda', 'short_debt', 'debt_capital', 'NAICS',
-       'ocf_lct', 'int_totdebt', 'PERMNO', 'totdebt_invcap', 'equity_invcap',
-       'lt_debt', 'staff_sale', 'cash_debt', 'CFACPR', 'dltt_be','BID', 'pcf', 'SHROUT', 'ALTPRC', 'GProf', 'pe_op_dil', 'cfm',
-       'accrual', 'bm', 'lt_ppent', 'evm', 'ASK', 'curr_debt', 'int_debt',
-       'quick_ratio', 'inv_turn', 'roce', 'ASKHI', 'opmbd', 'ptpm',
-       'sale_equity', 'fcf_ocf', 'capital_ratio', 'aftret_eq', 'cash_lt',
-       'cash_ratio', 'pay_turn', 'curr_ratio', 'rect_act', 'opmad',
-       'debt_invcap', 'profit_lct', 'invt_act', 'intcov', 'aftret_invcapx',
-       'debt_assets', 'aftret_equity', 'SPREAD', 'rd_sale', 'CFACSHR'], axis = 1)
-
-
-### Fill missing value with sklearn IMPUTER (fills with mean)
+### VERSION 1: Fill missing value with sklearn IMPUTER (fills with mean)
 imp = Imputer(missing_values=np.nan, strategy = ___FILLSTRAT___ , axis=0)
 imputed_dataset = pd.DataFrame(imp.fit_transform(joined_dataset))
 imputed_dataset.columns = joined_dataset.columns
 imputed_dataset.index = joined_dataset.index
 
-### Save output to csv
-joined_dataset.to_csv(___THISOUTPUT___ + 'joined_dataset_ml.csv')
 imputed_dataset.to_csv(___THISOUTPUT___ + 'imputed_dataset_ml.csv')
 
+### VERSION 2: Remove all rpws with Nan
+dropnan_dataset = joined_dataset.dropna()
 
-#### RANDOM FOREST###
+# Save 
+dropnan_dataset.to_csv(___THISOUTPUT___ + 'dropnan_dataset_ml.csv')
 
-# Extract labels of features
-labels_of_features = imputed_dataset.columns[:-1]
-# X1 is the feature matrix
-X1 = imputed_dataset.iloc[:, :-1]
-# y1 is the response vector
-y1 = imputed_dataset.iloc[:, -1]
-
-# Do the train - test- split
-X1_train, X1_test, y1_train, y1_test = train_test_split(X1, y1, test_size = 0.2, random_state = 0, stratify = y1)
-
-# CHeck if there is the approximately same percentage of '1' i both training and test response vector
-y1_train.sum() / y1_train.size
-y1_test.sum() / y1_test.size
-
-# Standardization with sklearn StandardScaler
-standard_scaler = preprocessing.StandardScaler().fit(X1_train)
-X1_train = standard_scaler.transform(X1_train)
-X1_test = standard_scaler.transform(X1_test)
-
-########## RANDOM FOREST FEATURE SELECTION ##########
-
-my_rainy_forest = RandomForestClassifier(random_state = 1)
-my_rainy_forest.max_depth = 8
-my_rainy_forest.fit(X1_train, y1_train)
-
-# Check features for their importance for the prediction
-features_importances = my_rainy_forest.feature_importances_
-# sort features in line with their importance for the prediction
-indices = np.argsort(features_importances)[::-1]
-
-# print best 15 features and delete features above and start the RF again
-i = 0
-n = 15
-for i in range(n):
-    print('{0:2d} {1:7s} {2:6.4f}'.format(i+1, labels_of_features[indices[i]], features_importances[indices[i]]))
-del i,n
-
-# Test prediction of y1 with the test feature matrix: gives the prediction vector
-prediction1 = my_rainy_forest.predict(X1_test)
-
-# Calculate percentage of of ones in the test response vector
-y_test_score = print('Ratio of Ones in the Test Set =  ' + str(y1_test.sum() / y1_test.size))
-# Just to be sure the ones are distributed ca.the same in test and train response vector, check this:
-y_train_score = print('Ratio of Ones in the Training Set =  ' + str(y1_train.sum() / y1_train.size))
-# Calculate precentage of ones predicted with the model
-prediction_score = print('Score of Prediction =  ' + str(prediction1.sum() / prediction1.size))
-
-# Calculate the score surplus above the test-set response vector score
-(prediction1.sum()/prediction1.size) - (y1_test.sum()/y1_test.size)
-
+### END
