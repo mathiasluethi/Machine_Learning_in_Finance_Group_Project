@@ -1,0 +1,4 @@
+Features Selected with Random Forest (RF)Features Selected with Random Forest (RF)Features Selected with Random Forest (RF)Features Selected with Random Forest (RF)Version 1; based on a Dataset with only Ratios as predictive Features.
+Multiple Logistic Regression with all selected features
+Features Selected with Random Forest (RF)Version 1; based on a Dataset with only Ratios as predictive Features.
+Multiple Logistic Regression with all selected features
